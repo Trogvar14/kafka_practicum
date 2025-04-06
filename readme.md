@@ -16,8 +16,8 @@ Docker Desktop 4.22.0
 - zookeeper
 
 3. Создаем топик c тремя партициями и с двумя репликациями
-```docker exec -it kafka_practicum-kafka1-1 kafka-topics --create --topic first_topic --bootstrap-server kafka1:9092 --partitions 3 --replication-factor 2```
-4. Проверяем топики с пмощью команды ```docker exec -it kafka_practicum-kafka1-1 kafka-topics --describe --topic first_topic --bootstrap-server kafka1:9092```
+```docker exec -it kafka1 kafka-topics --create --topic first_topic --bootstrap-server kafka1:9092 --partitions 3 --replication-factor 2```
+4. Проверяем топики с пмощью команды ```docker exec -it kafka1 kafka-topics --describe --topic first_topic --bootstrap-server kafka1:9092```
 5. Запускаем косюмер с автокоммитом и ручным коммитом
 - consumer-single.py - консюмер должен считывать по одному сообщению, обрабатывать его и коммитить оффсет автоматически.
 Запускается с помощью команды ```python3 consumer-single.py```
