@@ -1,0 +1,162 @@
+x-kafka-common-env: &kafka-common-env
+  KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+  KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+  KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+  KAFKA_CFG_SSL_KEYSTORE_TYPE: JKS
+  KAFKA_CFG_SSL_TRUSTSTORE_TYPE: JKS
+  KAFKA_CFG_SSL_KEYSTORE_PASSWORD: your-password
+  KAFKA_CFG_SSL_TRUSTSTORE_PASSWORD: your-password
+  KAFKA_CFG_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: "HTTPS"
+  KAFKA_CFG_SASL_ENABLED_MECHANISMS: PLAIN
+  KAFKA_CFG_SASL_MECHANISM_CONTROLLER_PROTOCOL: PLAIN
+  KAFKA_CFG_SASL_MECHANISM_INTER_BROKER_PROTOCOL: PLAIN
+  KAFKA_CFG_LISTENERS: SASL_SSL://:9092
+  KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: SASL_SSL:SASL_SSL
+  KAFKA_CFG_INTER_BROKER_LISTENER_NAME: SASL_SSL
+  KAFKA_CFG_AUTHORIZER_CLASS_NAME: kafka.security.authorizer.AclAuthorizer
+  KAFKA_CFG_SUPER_USERS: User:admin
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.4
+    container_name: zookeeper
+    hostname: zookeeper
+    ports:
+      - "2181:2181"
+    volumes:
+      - ./zookeeper.sasl.jaas.conf:/etc/zookeeper/secrets/zookeeper.sasl.jaas.conf
+      - ./kafka-0-creds:/etc/zookeeper/secrets
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      KAFKA_OPTS: >-
+        -Djava.security.auth.login.config=/etc/zookeeper/secrets/zookeeper.sasl.jaas.conf
+        -Dzookeeper.authProvider.sasl=org.apache.zookeeper.server.auth.SASLAuthenticationProvider
+        -Dzookeeper.allowSaslFailedClients=false
+        -Dzookeeper.requireClientAuthScheme=sasl
+    networks:
+      - kafka-connect-network
+
+  kafka-0:
+    image: bitnami/kafka:3.4
+    container_name: kafka-0
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      <<: *kafka-common-env
+      KAFKA_BROKER_ID: 0
+      KAFKA_CFG_ADVERTISED_LISTENERS: SASL_SSL://kafka-0:9092
+      KAFKA_CFG_SSL_KEYSTORE_LOCATION: /bitnami/kafka/config/certs/kafka.keystore.jks
+      KAFKA_CFG_SSL_TRUSTSTORE_LOCATION: /bitnami/kafka/config/certs/kafka.truststore.jks
+      KAFKA_ZOOKEEPER_PROTOCOL: SASL
+      KAFKA_ZOOKEEPER_USER: admin
+      KAFKA_ZOOKEEPER_PASSWORD: your-password
+      KAFKA_CLIENT_USER: admin
+      KAFKA_CLIENT_PASSWORD: your-password
+      # Основное для SASL:
+      KAFKA_OPTS: -Djava.security.auth.login.config=/bitnami/kafka/config/kafka_server_jaas.conf
+    volumes:
+      - ./kafka-0-creds/kafka-0.keystore.jks:/bitnami/kafka/config/certs/kafka.keystore.jks:ro
+      - ./kafka-0-creds/kafka-0.truststore.jks:/bitnami/kafka/config/certs/kafka.truststore.jks:ro
+      - ./kafka_server_jaas.conf:/bitnami/kafka/config/kafka_server_jaas.conf:ro
+    networks:
+      - kafka-connect-network
+
+  kafka-1:
+    image: bitnami/kafka:3.4
+    container_name: kafka-1
+    depends_on:
+      - zookeeper
+    ports:
+      - "9094:9092"
+    environment:
+      <<: *kafka-common-env
+      KAFKA_BROKER_ID: 1
+      KAFKA_CFG_ADVERTISED_LISTENERS: SASL_SSL://kafka-1:9092
+      KAFKA_CFG_SSL_KEYSTORE_LOCATION: /bitnami/kafka/config/certs/kafka.keystore.jks
+      KAFKA_CFG_SSL_TRUSTSTORE_LOCATION: /bitnami/kafka/config/certs/kafka.truststore.jks
+      KAFKA_ZOOKEEPER_PROTOCOL: SASL
+      KAFKA_ZOOKEEPER_USER: admin
+      KAFKA_ZOOKEEPER_PASSWORD: your-password
+      KAFKA_CLIENT_USER: admin
+      KAFKA_CLIENT_PASSWORD: your-password
+      KAFKA_OPTS: -Djava.security.auth.login.config=/bitnami/kafka/config/kafka_server_jaas.conf
+    volumes:
+      - ./kafka-1-creds/kafka-1.keystore.jks:/bitnami/kafka/config/certs/kafka.keystore.jks:ro
+      - ./kafka-1-creds/kafka-1.truststore.jks:/bitnami/kafka/config/certs/kafka.truststore.jks:ro
+      - ./kafka_server_jaas.conf:/bitnami/kafka/config/kafka_server_jaas.conf:ro
+    networks:
+      - kafka-connect-network
+
+  kafka-2:
+    image: bitnami/kafka:3.4
+    container_name: kafka-2
+    depends_on:
+      - zookeeper
+    ports:
+      - "9096:9092"
+    environment:
+      <<: *kafka-common-env
+      KAFKA_BROKER_ID: 2
+      KAFKA_CFG_ADVERTISED_LISTENERS: SASL_SSL://kafka-2:9092
+      KAFKA_CFG_SSL_KEYSTORE_LOCATION: /bitnami/kafka/config/certs/kafka.keystore.jks
+      KAFKA_CFG_SSL_TRUSTSTORE_LOCATION: /bitnami/kafka/config/certs/kafka.truststore.jks
+      KAFKA_ZOOKEEPER_PROTOCOL: SASL
+      KAFKA_ZOOKEEPER_USER: admin
+      KAFKA_ZOOKEEPER_PASSWORD: your-password
+      KAFKA_CLIENT_USER: admin
+      KAFKA_CLIENT_PASSWORD: your-password
+      KAFKA_OPTS: -Djava.security.auth.login.config=/bitnami/kafka/config/kafka_server_jaas.conf
+    volumes:
+      - ./kafka-2-creds/kafka-2.keystore.jks:/bitnami/kafka/config/certs/kafka.keystore.jks:ro
+      - ./kafka-2-creds/kafka-2.truststore.jks:/bitnami/kafka/config/certs/kafka.truststore.jks:ro
+      - ./kafka_server_jaas.conf:/bitnami/kafka/config/kafka_server_jaas.conf:ro
+    networks:
+      - kafka-connect-network
+
+  app-producer:
+    image: python:3.13
+    container_name: app-producer
+    volumes:
+      - ./ca.crt:/app/ca.crt
+      - ./producer.py:/app/producer.py
+      - ./kafka-0-creds:/app/kafka-0-creds
+    depends_on:
+      - kafka-0
+      - kafka-1
+      - kafka-2
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka-0:9092
+      SASL_USERNAME: producer
+      SASL_PASSWORD: your-password
+    working_dir: /app
+    command: sh -c "pip install --upgrade pip wheel setuptools confluent-kafka && practicum_6_v1 producer.py && tail -f /dev/null"
+    networks:
+      kafka-connect-network:
+
+  app-consumer:
+    image: python:3.13
+    container_name: app-consumer
+    volumes:
+      - ./ca.crt:/app/ca.crt
+      - ./consumer.py:/app/consumer.py
+      - ./kafka-0-creds:/app/kafka-0-creds
+    depends_on:
+      - kafka-0
+      - kafka-1
+      - kafka-2
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka-0:9092
+      KAFKA_GROUP_ID: consumer-ssl-group
+      SASL_USERNAME: consumer
+      SASL_PASSWORD: your-password
+    working_dir: /app
+    command: sh -c "pip install --upgrade pip wheel setuptools confluent-kafka && practicum_6_v1 consumer.py && tail -f /dev/null"
+    networks:
+      kafka-connect-network:
+
+networks:
+  kafka-connect-network:
+    name: kafka-connect-network
