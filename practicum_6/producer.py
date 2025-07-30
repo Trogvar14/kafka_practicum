@@ -1,58 +1,38 @@
-from confluent_kafka import Producer
-import socket
+# producer.py
+from kafka import KafkaProducer
+import ssl
+import os
 import time
-import sys
 
-def create_producer():
-    conf = {
-        'bootstrap.servers': 'localhost:9093,localhost:9095',  # SSL порты Kafka1 и Kafka2
-        'security.protocol': 'ssl',
-        'ssl.key.location': './ssl-client/client.key',
-        'ssl.certificate.location': './ssl-client/client.crt',
-        'ssl.ca.location': './ssl-client/ca.crt',
-        'ssl.key.password': 'changeit',  # пароль от ключа (если был)
-        'client.id': socket.gethostname(),
-        'enable.idempotence': True,
-        'acks': 'all',
-    }
-    return Producer(conf)
+cert_dir = "/app/client-creds"
 
-def delivery_report(err, msg):
-    if err is not None:
-        print(f"❌ Ошибка доставки: {err} в топик {msg.topic()}")
-    else:
-        print(f"✅ Сообщение доставлено: {msg.topic()} [{msg.partition()}] @ {msg.offset()}")
+print("Запуск продюсера...")
 
-def main():
-    try:
-        p = create_producer()
-    except Exception as e:
-        print(f"❌ Ошибка создания продюсера: {e}")
-        sys.exit(1)
+producer = KafkaProducer(
+    bootstrap_servers=['kafka1:9093', 'kafka2:9095'],
+    security_protocol="SSL",
+    ssl_cafile=os.path.join(cert_dir, 'ca.crt'),
+    ssl_certfile=os.path.join(cert_dir, 'client.crt'),
+    ssl_keyfile=os.path.join(cert_dir, 'client.key'),
+    ssl_password='changeit',
+    value_serializer=lambda v: v.encode('utf-8'),
+    acks='all',
+    retries=5,
+    retry_backoff_ms=1000
+)
 
-    topics = ['topic-1', 'topic-2']
-    print("Запуск продюсера. Отправка 5 сообщений в каждый топик...")
-
-    for i in range(5):
-        for topic in topics:
-            message = f"Hello from Python producer! Topic: {topic}, message #{i}"
-            try:
-                p.produce(
-                    topic,
-                    message.encode('utf-8'),
-                    callback=delivery_report
-                )
-            except BufferError:
-                print("❗ Очередь заполнена, ждём...")
-                p.poll(1.0)
-                p.produce(topic, message.encode('utf-8'), callback=delivery_report)
-            p.poll(0)  # Обработка колбэков
-
+try:
+    for i in range(10):
+        msg1 = f"Hello to topic-1: {i}"
+        msg2 = f"Hello to topic-2: {i}"
+        producer.send('topic-1', msg1)
+        producer.send('topic-2', msg2)
+        print(f"Отправлено: {msg1}")
+        print(f"Отправлено: {msg2}")
         time.sleep(1)
-
-    print("Ожидание доставки всех сообщений...")
-    p.flush(timeout=10)
-    print("✅ Все сообщения отправлены.")
-
-if __name__ == "__main__":
-    main()
+    producer.flush()
+    print("✅ Все сообщения отправлены!")
+except Exception as e:
+    print(f"❌ Ошибка продюсера: {e}")
+finally:
+    producer.close()

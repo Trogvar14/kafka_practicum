@@ -1,66 +1,56 @@
 # consumer.py
-from confluent_kafka import Consumer, KafkaException, KafkaError
-import signal
-import sys
+from kafka import KafkaConsumer
+import ssl
+import os
 
-# Для graceful shutdown
-def sigterm_handler(signum, frame):
-    print("\n🛑 Завершаем работу потребителя...")
-    c.close()
-    sys.exit(0)
+cert_dir = "/app/client-creds"
 
-signal.signal(signal.SIGTERM, sigterm_handler)
-signal.signal(signal.SIGINT, sigterm_handler)
+print("🚀 Запуск консьюмера...")
 
-def create_consumer():
-    conf = {
-        'bootstrap.servers': 'localhost:9093,localhost:9095',
-        'security.protocol': 'ssl',
-        'ssl.key.location': './ssl-client/client.key',
-        'ssl.certificate.location': './ssl-client/client.crt',
-        'ssl.ca.location': './ssl-client/ca.crt',
-        'ssl.key.password': 'changeit',
-        'group.id': 'python-test-group',
-        'auto.offset.reset': 'earliest',
-        'enable.auto.commit': True,
-        'session.timeout.ms': 60000,
-    }
-    return Consumer(conf)
+# Читаем из topic-1 (разрешено)
+print("✅ Попытка чтения из topic-1 (должно работать)...")
+try:
+    consumer1 = KafkaConsumer(
+        'topic-1',
+        bootstrap_servers=['kafka1:9093', 'kafka2:9095'],
+        security_protocol="SSL",
+        ssl_cafile=os.path.join(cert_dir, 'ca.crt'),
+        ssl_certfile=os.path.join(cert_dir, 'client.crt'),
+        ssl_keyfile=os.path.join(cert_dir, 'client.key'),
+        ssl_password='changeit',
+        auto_offset_reset='earliest',
+        group_id='test-group',
+        consumer_timeout_ms=10000
+    )
 
-def main():
-    c = create_consumer()
-    try:
-        c.subscribe(['topic-2'])
-        print("✅ Потребитель запущен. Ожидание сообщений из topic-2...")
-        print("Нажмите Ctrl+C для остановки.")
-    except KafkaException as e:
-        print(f"❌ Ошибка подписки: {e}")
-        sys.exit(1)
+    for msg in consumer1:
+        print(f"📥 topic-1: {msg.value.decode('utf-8')}")
+        break  # Прочитаем одно сообщение
+    consumer1.close()
+    print("✅ Чтение из topic-1 прошло успешно")
+except Exception as e:
+    print(f"❌ Ошибка чтения из topic-1: {e}")
 
-    try:
-        while True:
-            msg = c.poll(timeout=1.0)
-            if msg is None:
-                continue
-            if msg.error():
-                if msg.error().code() == KafkaError._PARTITION_EOF:
-                    continue
-                elif msg.error().code() == KafkaError.UNKNOWN_TOPIC_OR_PART:
-                    print(f"❌ Нет доступа к топику: {msg.topic()}")
-                    continue
-                else:
-                    print(f"❌ Ошибка Kafka: {msg.error()}")
-                    break
+# Читаем из topic-2 (запрещено)
+print("\n🔒 Попытка чтения из topic-2 (должно быть запрещено)...")
+try:
+    consumer2 = KafkaConsumer(
+        'topic-2',
+        bootstrap_servers=['kafka1:9093', 'kafka2:9095'],
+        security_protocol="SSL",
+        ssl_cafile=os.path.join(cert_dir, 'ca.crt'),
+        ssl_certfile=os.path.join(cert_dir, 'client.crt'),
+        ssl_keyfile=os.path.join(cert_dir, 'client.key'),
+        ssl_password='changeit',
+        auto_offset_reset='earliest',
+        group_id='test-group',
+        consumer_timeout_ms=10000
+    )
 
-            print(f"📨 Получено: {msg.value().decode('utf-8')} "
-                  f"из {msg.topic()}[{msg.partition()}] @ {msg.offset()} "
-                  f"(timestamp: {msg.timestamp()})")
-
-    except KeyboardInterrupt:
-        print("\n🛑 Остановлено пользователем.")
-    finally:
-        c.close()
-        print("✅ Потребитель остановлен.")
-
-if __name__ == "__main__":
-    main()
+    for msg in consumer2:
+        print(f"📥 topic-2: {msg.value.decode('utf-8')}")
+        break
+    consumer2.close()
+    print("❌ Ожидалась ошибка, но чтение прошло!")
+except Exception as e:
+    print(f"✅ Успешно: не удалось читать из topic-2 — {type(e).__name__}: {e}")

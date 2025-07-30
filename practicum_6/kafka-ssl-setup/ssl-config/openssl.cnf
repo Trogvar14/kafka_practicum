@@ -11,6 +11,12 @@ O = MyOrg
 OU = MyUnit
 CN = %COMMON_NAME%
 
+[ v3_ca ]
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid:always,issuer
+basicConstraints = CA:true
+subjectAltName = @alt_names
+
 [v3_req]
 basicConstraints = CA:FALSE
 keyUsage = nonRepudiation, digitalSignature, keyEncipherment

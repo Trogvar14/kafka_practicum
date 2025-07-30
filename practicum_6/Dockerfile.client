@@ -1,0 +1,20 @@
+# Dockerfile.client
+FROM python:3.10-slim
+
+WORKDIR /app
+
+# Установка зависимостей
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Копируем скрипты
+COPY producer.py consumer.py ./
+
+# Копируем сертификаты
+COPY ./kafka-ssl-setup/client-creds /app/client-creds
+
+# Переменная окружения (опционально)
+ENV PYTHONUNBUFFERED=1
+
+# По умолчанию — запуск продюсера
+CMD ["python", "producer.py"]

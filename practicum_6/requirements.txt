@@ -11,3 +11,5 @@ Authlib
 referencing
 jsonschema
 #rocksdb
+kafka-python==2.0.2
+pyopenssl
