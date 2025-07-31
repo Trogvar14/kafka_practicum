@@ -1,52 +1,41 @@
-import logging
+# producer.py
+from kafka import KafkaProducer
+import ssl
 import os
 import time
-import uuid
 
-from confluent_kafka import Producer
+cert_dir = "/app/client-creds"
 
+print("Запуск продюсера...")
 
-logger = logging.getLogger(__name__)
-
-logging.basicConfig(
-    level=logging.INFO,
-    filename="kafka_producer.log",
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+producer = KafkaProducer(
+    bootstrap_servers=['kafka-0:9092', 'kafka-1:9092', 'kafka-2:9092'],
+    security_protocol="SASL_SSL",
+    ssl_cafile=os.path.join(cert_dir, 'ca.crt'),
+    ssl_certfile=os.path.join(cert_dir, 'client.crt'),
+    ssl_keyfile=os.path.join(cert_dir, 'client.key'),
+    ssl_password='your-password',  # может не требоваться, если не зашифрован
+    sasl_mechanism='PLAIN',
+    sasl_plain_username='producer',
+    sasl_plain_password='your-password',
+    value_serializer=lambda v: v.encode('utf-8'),
+    acks='all',
+    retries=5,
+    retry_backoff_ms=1000
 )
 
-
-if __name__ == "__main__":
-    logger.info("До запуска 'producer': 60 сек.")
-    time.sleep(60)
-    logger.info("Конфигурация 'producer'...")
-
-    producer_conf = {
-        "bootstrap.servers": 'kafka-0:9092',
-
-        "security.protocol": "SASL_SSL",
-        "ssl.ca.location": "ca.crt",
-        "ssl.certificate.location": "kafka-0-creds/kafka-0.crt",
-        "ssl.key.location": "kafka-0-creds/kafka-0.key",
-
-        "ssl.endpoint.identification.algorithm": "none",
-        "sasl.mechanism": "PLAIN",
-        "sasl.username": 'producer',
-        "sasl.password": 'your-password',
-    }
-
-    try:
-        producer = Producer(producer_conf)
-
-        while True:
-            key = f"key-{uuid.uuid4()}"
-            value = "SASL/PLAIN"
-            producer.produce(
-                "topic-1",
-                key=key,
-                value=value,
-            )
-            producer.flush()
-            logger.info(f"Отправлено сообщение: {key=}, {value=}")
-            time.sleep(1)
-    except Exception as e:
-        logger.error(e)
+try:
+    for i in range(10):
+        msg1 = f"Hello to topic-1: {i}"
+        msg2 = f"Hello to topic-2: {i}"
+        producer.send('topic-1', msg1)
+        producer.send('topic-2', msg2)
+        print(f"Отправлено: {msg1}")
+        print(f"Отправлено: {msg2}")
+        time.sleep(1)
+    producer.flush()
+    print("✅ Все сообщения отправлены!")
+except Exception as e:
+    print(f"❌ Ошибка продюсера: {e}")
+finally:
+    producer.close()

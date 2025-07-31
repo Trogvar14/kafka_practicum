@@ -1,59 +1,64 @@
-import logging
+# consumer.py
+from kafka import KafkaConsumer
+import ssl
 import os
-import time
 
-from confluent_kafka import Consumer
+cert_dir = "/app/client-creds"
 
+print("🚀 Запуск консьюмера...")
 
-logger = logging.getLogger(__name__)
+# Читаем из topic-1 (разрешено)
+print("✅ Попытка чтения из topic-1 (должно работать)...")
+try:
+    consumer1 = KafkaConsumer(
+        'topic-1',
+        bootstrap_servers=['kafka-0:9092', 'kafka-1:9092', 'kafka-2:9092'],
+        security_protocol="SASL_SSL",
+        ssl_cafile=os.path.join(cert_dir, 'ca.crt'),
+        ssl_certfile=os.path.join(cert_dir, 'client.crt'),
+        ssl_keyfile=os.path.join(cert_dir, 'client.key'),
+        ssl_password='your-password',  # может не требоваться, если не зашифрован
+        sasl_mechanism='PLAIN',
+        sasl_plain_username='consumer',
+        sasl_plain_password='your-password',
+        value_serializer=lambda v: v.encode('utf-8'),
+        acks='all',
+        retries=5,
+        retry_backoff_ms=1000
+    )
 
-logging.basicConfig(
-    level=logging.INFO,
-    filename="kafka_consumer.log",
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
+    for msg in consumer1:
+        print(f"📥 topic-1: {msg.value.decode('utf-8')}")
+        break  # Прочитаем одно сообщение
+    consumer1.close()
+    print("✅ Чтение из topic-1 прошло успешно")
+except Exception as e:
+    print(f"❌ Ошибка чтения из topic-1: {e}")
 
+# Читаем из topic-2 (запрещено)
+print("\n🔒 Попытка чтения из topic-2 (должно быть запрещено)...")
+try:
+    consumer2 = KafkaConsumer(
+        'topic-2',
+        bootstrap_servers=['kafka-0:9092', 'kafka-1:9092', 'kafka-2:9092'],
+        security_protocol="SASL_SSL",
+        ssl_cafile=os.path.join(cert_dir, 'ca.crt'),
+        ssl_certfile=os.path.join(cert_dir, 'client.crt'),
+        ssl_keyfile=os.path.join(cert_dir, 'client.key'),
+        ssl_password='your-password',  # может не требоваться, если не зашифрован
+        sasl_mechanism='PLAIN',
+        sasl_plain_username='consumer',
+        sasl_plain_password='your-password',
+        value_serializer=lambda v: v.encode('utf-8'),
+        acks='all',
+        retries=5,
+        retry_backoff_ms=1000
+    )
 
-if __name__ == "__main__":
-    logger.info("До запуска 'consumer': 60 сек.")
-    time.sleep(60)
-    logger.info("Конфигурация 'consumer'...")
-
-    consumer_conf = {
-        "bootstrap.servers": 'kafka-0:9092',
-        "group.id": 'consumer-ssl-group',
-        "auto.offset.reset": "earliest",
-
-        "security.protocol": "SASL_SSL",
-        "ssl.ca.location": "ca.crt",
-        "ssl.certificate.location": "kafka-0-creds/kafka-0.crt",
-        "ssl.key.location": "kafka-0-creds/kafka-0.key",
-
-        "ssl.endpoint.identification.algorithm": "none",
-        "sasl.mechanism": "PLAIN",
-        "sasl.username": 'consumer',
-        "sasl.password": 'your-password',
-    }
-
-    try:
-        consumer = Consumer(consumer_conf)
-        consumer.subscribe(["topic-1", "topic-2"])
-
-        try:
-            while True:
-                message = consumer.poll(1)
-
-                if message is None:
-                    continue
-                if message.error():
-                    logger.error(f"Ошибка при получении сообщения: {message.error()}")
-                    continue
-
-                key = message.key().decode("utf-8")
-                value = message.value().decode("utf-8")
-                offset = message.offset()
-                logger.info(f"Получено сообщение: key='{key}', value='{value}', {offset=}")
-        finally:
-            consumer.close()
-    except Exception as e:
-            logger.error(e)
+    for msg in consumer2:
+        print(f"📥 topic-2: {msg.value.decode('utf-8')}")
+        break
+    consumer2.close()
+    print("❌ Ожидалась ошибка, но чтение прошло!")
+except Exception as e:
+    print(f"✅ Успешно: не удалось читать из topic-2 — {type(e).__name__}: {e}")

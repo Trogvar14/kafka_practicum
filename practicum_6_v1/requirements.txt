@@ -1,0 +1,15 @@
+#faust==1.10.4
+click==7.1.2
+aiohttp<3.9.0,>=3.8.0
+faust-streaming
+faust-streaming-rocksdb
+rocksdict
+#confluent-kafka
+httpx
+cachetools
+Authlib
+referencing
+jsonschema
+#rocksdb
+kafka-python==2.0.2
+pyopenssl
