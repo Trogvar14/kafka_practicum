@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.5.0
+    container_name: schema-registry
+    env_file: .env  # Лучше хранить секреты отдельно
+    environment:
+      - SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS=SASL_SSL://${KAFKA_BOOTSTRAP_SERVER}
+      - SCHEMA_REGISTRY_LISTENERS=http://0.0.0.0:8081
+      - SCHEMA_REGISTRY_HOST_NAME=localhost
+      - SCHEMA_REGISTRY_KAFKASTORE_SECURITY_PROTOCOL=SASL_SSL
+      - SCHEMA_REGISTRY_KAFKASTORE_SASL_MECHANISM=SCRAM-SHA-512
+      - SCHEMA_REGISTRY_KAFKASTORE_SASL_JAAS_CONFIG=org.apache.kafka.common.security.scram.ScramLoginModule required username="${KAFKA_USERNAME}" password="${KAFKA_PASSWORD}";
+      - SCHEMA_REGISTRY_KAFKASTORE_SSL_TRUSTSTORE_LOCATION=/etc/kafka/secrets/CA.pem
+      - SCHEMA_REGISTRY_KAFKASTORE_SSL_TRUSTSTORE_TYPE=PEM
+      - SCHEMA_REGISTRY_SCHEMA_REGISTRY_GROUP_ID=schema-registry-group
+      - SCHEMA_REGISTRY_LEADER_ELIGIBILITY=true
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./secrets:/etc/kafka/secrets
+    networks:
+      - kafka-net
+
+  nifi:
+    image: apache/nifi:1.26.0
+    container_name: nifi
+    ports:
+      - "8080:8080"
+    environment:
+      - NIFI_WEB_HTTP_PORT=8080
+      - NIFI_JVM_HEAP_INIT=1g
+      - NIFI_JVM_HEAP_MAX=2g
+    volumes:
+      # только файл truststore, а не весь conf
+      - ./security/truststore.jks:/opt/nifi/nifi-current/conf/truststore.jks:ro
+      - ./nifi_state:/opt/nifi/nifi-current/state
+      - ./nifi_database_repository:/opt/nifi/nifi-current/database_repository
+      - ./nifi_flowfile_repository:/opt/nifi/nifi-current/flowfile_repository
+      - ./nifi_content_repository:/opt/nifi/nifi-current/content_repository
+      - ./nifi_provenance_repository:/opt/nifi/nifi-current/provenance_repository
+    restart: unless-stopped
+
+networks:
+  kafka-net:
+    driver: bridge
