@@ -1,0 +1,365 @@
+version: "3.9"
+
+services:
+  zookeeper-a:
+    image: confluentinc/cp-zookeeper:7.6.1
+    hostname: zookeeper-a
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    volumes:
+      - zookeeper-a-data:/var/lib/zookeeper/data
+      - zookeeper-a-log:/var/lib/zookeeper/log
+    restart: unless-stopped
+
+  kafka-a-1:
+    image: confluentinc/cp-kafka:7.6.1
+    hostname: kafka-a-1
+    depends_on:
+      - zookeeper-a
+    ports:
+      - "19092:19092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper-a:2181
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+
+      # TLS-only (без SASL)
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:SSL,EXTERNAL:SSL
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:9092,EXTERNAL://0.0.0.0:19092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka-a-1:9092,EXTERNAL://localhost:19092
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+
+      # SSL настройки
+      KAFKA_SSL_CLIENT_AUTH: "none"
+      KAFKA_SSL_PROTOCOL: TLSv1.3
+      KAFKA_SSL_ENABLED_PROTOCOLS: TLSv1.2,TLSv1.3
+      KAFKA_SSL_KEYSTORE_LOCATION: /etc/kafka/secrets/kafka-a-1.keystore.jks
+      KAFKA_SSL_KEYSTORE_PASSWORD: changeit
+      KAFKA_SSL_KEY_PASSWORD: changeit
+      KAFKA_SSL_TRUSTSTORE_LOCATION: /etc/kafka/secrets/kafka.truststore.jks
+      KAFKA_SSL_TRUSTSTORE_PASSWORD: changeit
+
+      # Минимально нужные системные топики для кластера из 2 брокеров
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 2
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 2
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 2
+      KAFKA_MIN_INSYNC_REPLICAS: 1
+
+    volumes:
+      - kafka-a-1-data:/var/lib/kafka/data
+      - ./certs/a:/etc/kafka/secrets:ro
+    restart: unless-stopped
+
+  kafka-a-2:
+    image: confluentinc/cp-kafka:7.6.1
+    hostname: kafka-a-2
+    depends_on:
+      - zookeeper-a
+    ports:
+      - "19093:19093"
+    environment:
+      KAFKA_BROKER_ID: 2
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper-a:2181
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:SSL,EXTERNAL:SSL
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:9092,EXTERNAL://0.0.0.0:19093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka-a-2:9092,EXTERNAL://localhost:19093
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+
+      KAFKA_SSL_CLIENT_AUTH: "none"
+      KAFKA_SSL_PROTOCOL: TLSv1.3
+      KAFKA_SSL_ENABLED_PROTOCOLS: TLSv1.2,TLSv1.3
+      KAFKA_SSL_KEYSTORE_LOCATION: /etc/kafka/secrets/kafka-a-2.keystore.jks
+      KAFKA_SSL_KEYSTORE_PASSWORD: changeit
+      KAFKA_SSL_KEY_PASSWORD: changeit
+      KAFKA_SSL_TRUSTSTORE_LOCATION: /etc/kafka/secrets/kafka.truststore.jks
+      KAFKA_SSL_TRUSTSTORE_PASSWORD: changeit
+
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 2
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 2
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 2
+      KAFKA_MIN_INSYNC_REPLICAS: 1
+
+    volumes:
+      - kafka-a-2-data:/var/lib/kafka/data
+      - ./certs/a:/etc/kafka/secrets:ro
+    restart: unless-stopped
+
+  zookeeper-b:
+    image: confluentinc/cp-zookeeper:7.6.1
+    hostname: zookeeper-b
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    volumes:
+      - zookeeper-b-data:/var/lib/zookeeper/data
+      - zookeeper-b-log:/var/lib/zookeeper/log
+    restart: unless-stopped
+
+  kafka-b-1:
+    image: confluentinc/cp-kafka:7.6.1
+    hostname: kafka-b-1
+    depends_on:
+      - zookeeper-b
+    ports:
+      - "19094:19094"
+    environment:
+      KAFKA_BROKER_ID: 11
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper-b:2181
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:SSL,EXTERNAL:SSL
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:9092,EXTERNAL://0.0.0.0:19094
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka-b-1:9092,EXTERNAL://localhost:19094
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+
+      KAFKA_SSL_CLIENT_AUTH: "none"
+      KAFKA_SSL_PROTOCOL: TLSv1.3
+      KAFKA_SSL_ENABLED_PROTOCOLS: TLSv1.2,TLSv1.3
+      KAFKA_SSL_KEYSTORE_LOCATION: /etc/kafka/secrets/kafka-b-1.keystore.jks
+      KAFKA_SSL_KEYSTORE_PASSWORD: changeit
+      KAFKA_SSL_KEY_PASSWORD: changeit
+      KAFKA_SSL_TRUSTSTORE_LOCATION: /etc/kafka/secrets/kafka.truststore.jks
+      KAFKA_SSL_TRUSTSTORE_PASSWORD: changeit
+
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 2
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 2
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 2
+      KAFKA_MIN_INSYNC_REPLICAS: 1
+
+    volumes:
+      - kafka-b-1-data:/var/lib/kafka/data
+      - ./certs/b:/etc/kafka/secrets:ro
+    restart: unless-stopped
+
+  kafka-b-2:
+    image: confluentinc/cp-kafka:7.6.1
+    hostname: kafka-b-2
+    depends_on:
+      - zookeeper-b
+    ports:
+      - "19095:19095"
+    environment:
+      KAFKA_BROKER_ID: 12
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper-b:2181
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:SSL,EXTERNAL:SSL
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:9092,EXTERNAL://0.0.0.0:19095
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka-b-2:9092,EXTERNAL://localhost:19095
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+
+      KAFKA_SSL_CLIENT_AUTH: "none"
+      KAFKA_SSL_PROTOCOL: TLSv1.3
+      KAFKA_SSL_ENABLED_PROTOCOLS: TLSv1.2,TLSv1.3
+      KAFKA_SSL_KEYSTORE_LOCATION: /etc/kafka/secrets/kafka-b-2.keystore.jks
+      KAFKA_SSL_KEYSTORE_PASSWORD: changeit
+      KAFKA_SSL_KEY_PASSWORD: changeit
+      KAFKA_SSL_TRUSTSTORE_LOCATION: /etc/kafka/secrets/kafka.truststore.jks
+      KAFKA_SSL_TRUSTSTORE_PASSWORD: changeit
+
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 2
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 2
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 2
+      KAFKA_MIN_INSYNC_REPLICAS: 1
+
+    volumes:
+      - kafka-b-2-data:/var/lib/kafka/data
+      - ./certs/b:/etc/kafka/secrets:ro
+    restart: unless-stopped
+
+  final-mm2:
+    image: confluentinc/cp-kafka-connect:7.6.1
+    container_name: final-mm2
+    command: [ "/usr/bin/connect-mirror-maker", "/etc/mm2/mm2.properties" ]
+    environment:
+      - KAFKA_LOG4J_OPTS=-Dlog4j.configuration=file:/etc/kafka/connect-log4j.properties
+    volumes:
+      - ./mm2/mm2.properties:/etc/mm2/mm2.properties:ro
+      - ./certs/a/kafka.truststore.jks:/etc/mm2/secrets/kafka.truststore.jks:ro
+    depends_on:
+      - kafka-a-1
+      - kafka-a-2
+      - kafka-b-1
+      - kafka-b-2
+  pg:
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: pgpass
+      POSTGRES_USER: pguser
+      POSTGRES_DB: marketplace
+    ports: [ "5432:5432" ]
+    volumes:
+      - ./sql/init:/docker-entrypoint-initdb.d:ro
+#  ui:
+#    image: provectuslabs/kafka-ui:v0.7.0
+#    restart: always
+#    ports:
+#      - "127.0.0.1:8085:8080"
+#    environment:
+#      KAFKA_CLUSTERS_0_BOOTSTRAP_SERVERS: kafka-a-1:9092,kafka-a-2:9092,kafka-b-1:9092,kafka-b-2:9092
+#      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+#      cdSQLDBSERVER: http://ksqldb:8088
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: final-kafka-ui
+    restart: unless-stopped
+    depends_on:
+      - kafka-a-1
+      - kafka-a-2
+      - kafka-b-1
+      - kafka-b-2
+    ports:
+      - "8080:8080"
+    environment:
+      # === Cluster A ===
+      KAFKA_CLUSTERS_0_NAME: "clusterA"
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: "kafka-a-1:9092,kafka-a-2:9092"
+      KAFKA_CLUSTERS_0_PROPERTIES_SECURITY_PROTOCOL: "SSL"
+      KAFKA_CLUSTERS_0_PROPERTIES_SSL_TRUSTSTORE_LOCATION: "/etc/kafka/secrets/kafka.truststore.jks"
+      KAFKA_CLUSTERS_0_PROPERTIES_SSL_TRUSTSTORE_PASSWORD: "changeit"
+      KAFKA_CLUSTERS_0_PROPERTIES_SSL_TRUSTSTORE_TYPE: "JKS"
+      # При необходимости временно отключи проверку hostname:
+      # KAFKA_CLUSTERS_0_PROPERTIES_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: ""
+
+      # === Cluster B ===
+      KAFKA_CLUSTERS_1_NAME: "clusterB"
+      KAFKA_CLUSTERS_1_BOOTSTRAPSERVERS: "kafka-b-1:9092,kafka-b-2:9092"
+      KAFKA_CLUSTERS_1_PROPERTIES_SECURITY_PROTOCOL: "SSL"
+      KAFKA_CLUSTERS_1_PROPERTIES_SSL_TRUSTSTORE_LOCATION: "/etc/kafka/secrets/kafka.truststore.jks"
+      KAFKA_CLUSTERS_1_PROPERTIES_SSL_TRUSTSTORE_PASSWORD: "changeit"
+      KAFKA_CLUSTERS_1_PROPERTIES_SSL_TRUSTSTORE_TYPE: "JKS"
+      # KAFKA_CLUSTERS_1_PROPERTIES_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: ""
+    volumes:
+      - ./certs/a/kafka.truststore.jks:/etc/kafka/secrets/kafka.truststore.jks:ro
+    networks:
+      - default
+
+  hdfs-namenode:
+    image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
+    container_name: final-hdfs-namenode
+    restart: unless-stopped
+    environment:
+      - CLUSTER_NAME=hdfs
+      - CORE_CONF_fs_defaultFS=hdfs://hdfs-namenode:9000
+      - HDFS_CONF_dfs_namenode_name_dir=file:///hadoop/dfs/name
+      - HDFS_CONF_dfs_replication=1
+    ports:
+      - "9870:9870"       # WebUI NN
+    volumes:
+      - hdfs-nn:/hadoop/dfs/name
+    networks:
+      - default
+
+  hdfs-datanode:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    container_name: final-hdfs-datanode
+    restart: unless-stopped
+    environment:
+      - CORE_CONF_fs_defaultFS=hdfs://hdfs-namenode:9000
+      - HDFS_CONF_dfs_datanode_data_dir=file:///hadoop/dfs/data
+    ports:
+      - "9864:9864"       # WebUI DN
+    depends_on: [ hdfs-namenode ]
+    volumes:
+      - hdfs-dn:/hadoop/dfs/data
+    networks:
+      - default
+
+  # ==== Spark submitter ====
+  spark:
+    image: bitnami/spark:3.5
+    container_name: final-spark
+    user: "0:0"
+    volumes:
+      - ./spark_jobs:/opt/spark_jobs:ro
+      - ./certs/b/kafka.truststore.jks:/opt/certs/kafka.truststore.jks:ro  # truststore для B
+    depends_on:
+      - hdfs-namenode
+      - hdfs-datanode
+      - kafka-b-1
+      - kafka-b-2
+    networks:
+      - default
+
+  faust:
+    build:
+      context: ./faust_app
+      dockerfile: Dockerfile
+    container_name: faust
+    working_dir: /opt/app
+    depends_on:
+      - kafka-a-1
+      - kafka-a-2
+    volumes:
+      - ./faust_app/data:/opt/app/data
+      - ./certs/ca.pem:/etc/faust/ca.pem:ro
+    command: bash -lc "faust -A app worker -l info"
+    networks:
+      - default
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+
+  connect-sink:
+    image: confluentinc/cp-kafka-connect:7.6.1
+    container_name: final-connect-sink
+    depends_on:
+      - kafka-a-1
+      - kafka-a-2
+      - kafka-b-1
+      - kafka-b-2
+      - pg
+    environment:
+      CONNECT_BOOTSTRAP_SERVERS: "kafka-b-1:9092,kafka-b-2:9092"
+      CONNECT_REST_ADVERTISED_HOST_NAME: "connect-sink"
+      CONNECT_GROUP_ID: "connect-sink"
+      CONNECT_CONFIG_STORAGE_TOPIC: "connect-sink-configs"
+      CONNECT_OFFSET_STORAGE_TOPIC: "connect-sink-offsets"
+      CONNECT_STATUS_STORAGE_TOPIC: "connect-sink-status"
+      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: "2"
+      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: "2"
+      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: "2"
+      CONNECT_KEY_CONVERTER: "org.apache.kafka.connect.storage.StringConverter"
+      CONNECT_VALUE_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
+      CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+      CONNECT_PLUGIN_PATH: "/usr/share/java,/usr/share/confluent-hub-components"
+      # TLS к B
+      CONNECT_SECURITY_PROTOCOL: "SSL"
+      CONNECT_SSL_TRUSTSTORE_LOCATION: "/etc/kafka/secrets/kafka.truststore.jks"
+      CONNECT_SSL_TRUSTSTORE_PASSWORD: "changeit"
+      CONNECT_SSL_TRUSTSTORE_TYPE: "JKS"
+      # автоустановка JDBC-плагина при старте
+      CONNECT_CONFLUENT_TOPIC_REPLICATION_FACTOR: "2"
+    command:
+      - bash
+      - -lc
+      - |
+        confluent-hub install --no-prompt confluentinc/kafka-connect-jdbc:10.7.6
+        /etc/confluent/docker/run
+    volumes:
+      - ./certs/b/kafka.truststore.jks:/etc/kafka/secrets/kafka.truststore.jks:ro
+    ports:
+      - "8084:8083"   # REST Connect
+    networks:
+      - default
+
+
+volumes:
+  zookeeper-a-data: {}
+  zookeeper-a-log: {}
+  kafka-a-1-data: {}
+  kafka-a-2-data: {}
+  zookeeper-b-data: {}
+  zookeeper-b-log: {}
+  kafka-b-1-data: {}
+  kafka-b-2-data: {}
+  hdfs-nn: {}
+  hdfs-dn: {}
