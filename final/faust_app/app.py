@@ -1,57 +1,67 @@
+import os
 import ssl
 import faust
 
-# --- SSL для подключения к Kafka (корневой PEM) ---
-def ssl_ctx() -> ssl.SSLContext:
-    return ssl.create_default_context(cafile="/etc/faust/ca.pem")
+class Product(faust.Record, serializer="json"):
+    id: str
+    name: str
+    price: float
+    shop_id: str = ""
 
-# --- Faust App ---
+class BanCmd(faust.Record, serializer="json"):
+    op: str   # add|remove|list
+    name: str = ""
+
+BROKER = os.getenv("FAUST_BROKER", "kafka://kafka-a-1:9092,kafka-a-2:9092")
+CAFILE = os.getenv("FAUST_SSL_CAFILE", "/etc/faust/ca.pem")
+CHECK_HOST = os.getenv("FAUST_SSL_CHECK_HOSTNAME", "true").lower() == "true"
+
+def build_ssl_ctx() -> ssl.SSLContext:
+    ctx = ssl.create_default_context(cafile=CAFILE)
+    if not CHECK_HOST:
+        ctx.check_hostname = False
+    return ctx
+
+ssl_ctx = build_ssl_ctx()
+
 app = faust.App(
     "banlist-filter",
-    broker="kafka://kafka-a-1:9092,kafka-a-2:9092",   # строго строка, не список!
-    value_serializer="json",
-    broker_credentials=ssl_ctx(),
+    broker=BROKER,                 # ВАЖНО: обычный kafka://
+    broker_credentials=ssl_ctx,    # допустимо передавать ssl.SSLContext
 )
+# TLS для aiokafka
+app.conf.producer_client_kwargs = {"security_protocol": "SSL", "ssl_context": ssl_ctx}
+app.conf.consumer_client_kwargs = {"security_protocol": "SSL", "ssl_context": ssl_ctx}
+# если вдруг будет ошибка по hostname/SAN — можно на время ослабить проверку:
+# app.conf.ssl_check_hostname = False
+# app.conf.ssl_endpoint_identification_algorithm = ""
 
-# --- Топики ---
-products = app.topic("products")                # вход: товары от магазинов
-allowed  = app.topic("products_allowed")        # выход: разрешённые товары
-ban_cmds = app.topic("banlist_commands")        # вход: команды управления бан-листом
+products_topic = app.topic("shop.products.raw", value_type=Product)
+ban_cmds_topic = app.topic("shop.banned", value_type=BanCmd)
+filtered_topic = app.topic("shop.products.filtered", value_type=Product)
 
-# Храним бан-лист в Table: ключ — normalized имя/sku товара, значение — True
-banlist = app.Table("banlist", default=bool)
+banlist = app.Table("banlist", key_type=str, value_type=bool, default=False, partitions=1)
 
-def norm(s: str) -> str:
-    return (s or "").strip().lower()
-
-# --- Агент управления бан-листом ---
-@app.agent(ban_cmds)
+@app.agent(ban_cmds_topic)
 async def handle_ban_cmds(stream):
-    async for msg in stream:
-        # ожидаем {"op": "add"|"remove", "item": "название или sku"}
-        op   = (msg or {}).get("op")
-        item = norm((msg or {}).get("item", ""))
-        if not item:
-            continue
-        if op == "add":
-            banlist[item] = True
-            app.log.info("BAN ADD: %r", item)
-        elif op == "remove":
-            banlist.pop(item, None)
-            app.log.info("BAN REMOVE: %r", item)
+    async for cmd in stream:
+        op = (cmd.op or "").lower()
+        name = (cmd.name or "").strip()
+        if op == "add" and name:
+            banlist[name] = True
+            print(f"[banlist] add: {name}")
+        elif op == "remove" and name:
+            banlist.pop(name, None)
+            print(f"[banlist] remove: {name}")
+        elif op == "list":
+            print("[banlist] current:", [k for k, v in banlist.items() if v])
+        else:
+            print("[banlist] unknown cmd:", cmd)
 
-# --- Агент фильтрации товаров ---
-@app.agent(products)
+@app.agent(products_topic)
 async def filter_products(stream):
     async for p in stream:
-        # ожидаем json с хотя бы name или sku
-        name = norm((p or {}).get("name", ""))
-        sku  = norm((p or {}).get("sku", ""))
-        key  = name or sku
-        if not key:
-            continue
-        if banlist.get(key, False):
-            app.log.info("BLOCKED: %s", key)
-            continue
-        await allowed.send(value=p)
-        app.log.debug("ALLOWED: %s", key)
+        if not banlist.get(p.name, False):
+            await filtered_topic.send(value=p)
+        else:
+            print(f"[filter] blocked banned product: {p.name}")

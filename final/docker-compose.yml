@@ -292,18 +292,16 @@ services:
   faust:
     build:
       context: ./faust_app
-      dockerfile: Dockerfile
     container_name: faust
-    working_dir: /opt/app
     depends_on:
       - kafka-a-1
       - kafka-a-2
+    environment:
+      FAUST_SSL_CAFILE: /etc/faust/ca.pem
     volumes:
-      - ./faust_app/data:/opt/app/data
       - ./certs/ca.pem:/etc/faust/ca.pem:ro
-    command: bash -lc "faust -A app worker -l info"
-    networks:
-      - default
+    command: [ "faust","-A","app","worker","-l","info" ]
+    restart: unless-stopped
     dns:
       - 8.8.8.8
       - 1.1.1.1

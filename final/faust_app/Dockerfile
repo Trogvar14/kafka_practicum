@@ -1,20 +1,27 @@
 FROM python:3.9-slim
 
+ENV PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends openssl ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /opt/app
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+COPY requirements.txt ./
 
-# сначала нужно только файл требований
-COPY requirements.txt .
+# ставим всё одной командой, выпиливаем старый robinhood-faust
+RUN python -m pip install --upgrade pip \
+ && python -m pip uninstall -y faust || true \
+ && python -m pip install --no-cache-dir -r requirements.txt \
+ && python - <<'PY'
+import faust, mode, yarl
+import mode.utils.compat as compat
+print("faust:", getattr(faust, "__version__", "unknown"))
+print("mode:", getattr(mode, "__version__", "unknown"))
+print("yarl:", yarl.__version__)
+print("compat has OrderedDict:", hasattr(compat, "OrderedDict"))
+assert hasattr(compat,"OrderedDict"), "Wrong mode version — no OrderedDict in compat!"
+PY
 
-# 1) ставим faust-streaming без зависимостей, чтобы не притащило неверные версии
-RUN pip install --no-cache-dir --no-deps faust-streaming==0.10.13
-
-# 2) теперь ставим всё остальное, уже совместимое
-RUN pip install --no-cache-dir -r requirements.txt
-
-# копируем код
-COPY app.py banctl.py ./
-
-CMD ["bash","-lc","faust -A app worker -l info"]
+COPY app.py ./
+CMD ["faust","-A","app","worker","-l","info"]
