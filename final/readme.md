@@ -42,40 +42,40 @@ python3.11 shop_api/cli.py recs --user <user_id из поиска>
 curl -s -X POST http://localhost:8084/connectors -H 'Content-Type: application/json' -d '{
   "name": "sink-products-pg",
   "config": {
-    "connector.class":"io.confluent.connect.jdbc.JdbcSinkConnector",
-    "topics":"products_filtered",
-    "connection.url":"jdbc:postgresql://postgres:5432/marketplace",
-    "connection.user":"postgres",
-    "connection.password":"postgres",
-    "auto.create":"true",
-    "auto.evolve":"true",
-    "insert.mode":"upsert",
-    "pk.mode":"record_value",
-    "pk.fields":"product_id",
-    "tasks.max":"1",
-    "value.converter":"org.apache.kafka.connect.json.JsonConverter",
-    "value.converter.schemas.enable":"false"
+    "connector.class": "io.confluent.connect.jdbc.JdbcSinkConnector",
+    "topics": "shop.products.filtered",
+    "connection.url": "jdbc:postgresql://pg:5432/marketplace",
+    "connection.user": "pguser",
+    "connection.password": "pgpass",
+    "auto.create": "true",
+    "auto.evolve": "true",
+    "insert.mode": "upsert",
+    "pk.mode": "record_value",
+    "pk.fields": "product_id",
+    "tasks.max": "1",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter.schemas.enable": "false"
   }
 }'
 ```
 Recommendations -> Postgres
 ```bash
 curl -s -X POST http://localhost:8084/connectors -H 'Content-Type: application/json' -d '{
-  "name": "sink-recommendations-pg",
+  "name": "sink-recos-pg",
   "config": {
-    "connector.class":"io.confluent.connect.jdbc.JdbcSinkConnector",
-    "topics":"recommendations",
-    "connection.url":"jdbc:postgresql://postgres:5432/marketplace",
-    "connection.user":"postgres",
-    "connection.password":"postgres",
-    "auto.create":"true",
-    "auto.evolve":"true",
-    "insert.mode":"upsert",
-    "pk.mode":"record_key",
-    "pk.fields":"key",
-    "tasks.max":"1",
-    "value.converter":"org.apache.kafka.connect.json.JsonConverter",
-    "value.converter.schemas.enable":"false"
+    "connector.class": "io.confluent.connect.jdbc.JdbcSinkConnector",
+    "topics": "recommendations",
+    "connection.url": "jdbc:postgresql://pg:5432/marketplace",
+    "connection.user": "pguser",
+    "connection.password": "pgpass",
+    "auto.create": "true",
+    "table.name.format": "recommendations",
+    "insert.mode": "insert",
+    "pk.mode": "record_key",
+    "tasks.max": "1",
+    "key.converter": "org.apache.kafka.connect.storage.StringConverter",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter.schemas.enable": "false"
   }
 }'
 ```

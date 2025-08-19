@@ -37,8 +37,8 @@ app.conf.consumer_client_kwargs = {"security_protocol": "SSL", "ssl_context": ss
 # app.conf.ssl_endpoint_identification_algorithm = ""
 
 products_topic = app.topic("shop.products.raw", value_type=Product)
-ban_cmds_topic = app.topic("shop.banned", value_type=BanCmd)
-filtered_topic = app.topic("shop.products.filtered", value_type=Product)
+filtered_topic  = app.topic("shop.products.filtered", value_type=Product)
+ban_cmds_topic  = app.topic("ban.cmds", value_type=BanCmd)
 
 banlist = app.Table("banlist", key_type=str, value_type=bool, default=False, partitions=1)
 
@@ -49,14 +49,12 @@ async def handle_ban_cmds(stream):
         name = (cmd.name or "").strip()
         if op == "add" and name:
             banlist[name] = True
-            print(f"[banlist] add: {name}")
         elif op == "remove" and name:
             banlist.pop(name, None)
-            print(f"[banlist] remove: {name}")
         elif op == "list":
-            print("[banlist] current:", [k for k, v in banlist.items() if v])
+            print("[banlist]", [n for n, v in banlist.items() if v])
         else:
-            print("[banlist] unknown cmd:", cmd)
+            print("[banctl] unknown:", cmd)
 
 @app.agent(products_topic)
 async def filter_products(stream):
@@ -64,4 +62,4 @@ async def filter_products(stream):
         if not banlist.get(p.name, False):
             await filtered_topic.send(value=p)
         else:
-            print(f"[filter] blocked banned product: {p.name}")
+            print(f"[filter] blocked: {p.name}")

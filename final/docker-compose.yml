@@ -19,6 +19,7 @@ services:
       - zookeeper-a
     ports:
       - "19092:19092"
+      - "9991:9991"
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper-a:2181
@@ -47,6 +48,16 @@ services:
       KAFKA_DEFAULT_REPLICATION_FACTOR: 2
       KAFKA_MIN_INSYNC_REPLICAS: 1
 
+      #JMX
+      KAFKA_OPTS: >-
+        -Dcom.sun.management.jmxremote
+        -Dcom.sun.management.jmxremote.local.only=false
+        -Dcom.sun.management.jmxremote.authenticate=false
+        -Dcom.sun.management.jmxremote.ssl=false
+        -Djava.rmi.server.hostname=kafka-a-1
+        -Dcom.sun.management.jmxremote.port=9991
+        -Dcom.sun.management.jmxremote.rmi.port=9991
+
     volumes:
       - kafka-a-1-data:/var/lib/kafka/data
       - ./certs/a:/etc/kafka/secrets:ro
@@ -59,6 +70,7 @@ services:
       - zookeeper-a
     ports:
       - "19093:19093"
+      - "9992:9992"
     environment:
       KAFKA_BROKER_ID: 2
       KAFKA_ZOOKEEPER_CONNECT: zookeeper-a:2181
@@ -84,6 +96,16 @@ services:
       KAFKA_DEFAULT_REPLICATION_FACTOR: 2
       KAFKA_MIN_INSYNC_REPLICAS: 1
 
+      #JMX
+      KAFKA_OPTS: >-
+        -Dcom.sun.management.jmxremote
+        -Dcom.sun.management.jmxremote.local.only=false
+        -Dcom.sun.management.jmxremote.authenticate=false
+        -Dcom.sun.management.jmxremote.ssl=false
+        -Djava.rmi.server.hostname=kafka-a-2
+        -Dcom.sun.management.jmxremote.port=9992
+        -Dcom.sun.management.jmxremote.rmi.port=9992
+
     volumes:
       - kafka-a-2-data:/var/lib/kafka/data
       - ./certs/a:/etc/kafka/secrets:ro
@@ -107,6 +129,7 @@ services:
       - zookeeper-b
     ports:
       - "19094:19094"
+      - "9993:9993"
     environment:
       KAFKA_BROKER_ID: 11
       KAFKA_ZOOKEEPER_CONNECT: zookeeper-b:2181
@@ -132,6 +155,16 @@ services:
       KAFKA_DEFAULT_REPLICATION_FACTOR: 2
       KAFKA_MIN_INSYNC_REPLICAS: 1
 
+      #JMX
+      KAFKA_OPTS: >-
+        -Dcom.sun.management.jmxremote
+        -Dcom.sun.management.jmxremote.local.only=false
+        -Dcom.sun.management.jmxremote.authenticate=false
+        -Dcom.sun.management.jmxremote.ssl=false
+        -Djava.rmi.server.hostname=kafka-b-1
+        -Dcom.sun.management.jmxremote.port=9993
+        -Dcom.sun.management.jmxremote.rmi.port=9993
+
     volumes:
       - kafka-b-1-data:/var/lib/kafka/data
       - ./certs/b:/etc/kafka/secrets:ro
@@ -144,6 +177,7 @@ services:
       - zookeeper-b
     ports:
       - "19095:19095"
+      - "9994:9994"
     environment:
       KAFKA_BROKER_ID: 12
       KAFKA_ZOOKEEPER_CONNECT: zookeeper-b:2181
@@ -168,6 +202,16 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_DEFAULT_REPLICATION_FACTOR: 2
       KAFKA_MIN_INSYNC_REPLICAS: 1
+
+      #JMX
+      KAFKA_OPTS: >-
+        -Dcom.sun.management.jmxremote
+        -Dcom.sun.management.jmxremote.local.only=false
+        -Dcom.sun.management.jmxremote.authenticate=false
+        -Dcom.sun.management.jmxremote.ssl=false
+        -Djava.rmi.server.hostname=kafka-b-2
+        -Dcom.sun.management.jmxremote.port=9994
+        -Dcom.sun.management.jmxremote.rmi.port=9994
 
     volumes:
       - kafka-b-2-data:/var/lib/kafka/data
@@ -349,6 +393,96 @@ services:
     networks:
       - default
 
+  grafana:
+    image: "grafana/grafana:${GRAFANA_VERSION}"
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      GF_PATHS_DATA: /var/lib/grafana
+      GF_SECURITY_ADMIN_PASSWORD: kafka
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+    container_name: grafana
+    depends_on:
+      - prometheus
+
+  prometheus:
+    image: "prom/prometheus:${PROMETHEUS_VERSION}"
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./etc/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./etc/prometheus/alert.rules:/etc/prometheus/alert.rules
+    command: "--config.file=/etc/prometheus/prometheus.yml"
+    container_name: prometheus
+
+  alertmanager:
+    image: prom/alertmanager:v0.21.0
+    restart: unless-stopped
+    container_name: alertmanager
+    volumes:
+      - ./etc/alertmanager/config.yml:/etc/alertmanager/config.yml
+    command:
+      - '--config.file=/etc/alertmanager/config.yml'
+      - '--storage.path=/alertmanager'
+      - '--log.level=debug'
+    ports:
+      - 9093:9093
+
+  jmx-kafka101:
+    image: "sscaling/jmx-prometheus-exporter"
+    restart: unless-stopped
+    ports:
+      - "5556:5556"
+    environment:
+      CONFIG_YML: "/etc/jmx_exporter/config.yml"
+      JVM_OPTS: ${PROMETHEUS_JMX_AGENT_JVM_OPTS}
+    volumes:
+      - ./etc/jmx_exporter/config_kafka101.yml:/etc/jmx_exporter/config.yml
+    container_name: jmx-kafka101
+    depends_on:
+      - kafka-a-1
+      - kafka-a-2
+      - kafka-b-1
+      - kafka-b-2
+
+  jmx-kafka102:
+    image: "sscaling/jmx-prometheus-exporter"
+    restart: unless-stopped
+    ports:
+      - "5557:5556"
+    environment:
+      CONFIG_YML: "/etc/jmx_exporter/config.yml"
+      JVM_OPTS: ${PROMETHEUS_JMX_AGENT_JVM_OPTS}
+
+    volumes:
+      - ./etc/jmx_exporter/config_kafka102.yml:/etc/jmx_exporter/config.yml
+    container_name: jmx-kafka102
+    depends_on:
+      - kafka-a-1
+      - kafka-a-2
+      - kafka-b-1
+      - kafka-b-2
+
+  jmx-kafka103:
+    image: "sscaling/jmx-prometheus-exporter"
+    restart: unless-stopped
+    ports:
+      - "5558:5556"
+    environment:
+      CONFIG_YML: "/etc/jmx_exporter/config.yml"
+      JVM_OPTS: ${PROMETHEUS_JMX_AGENT_JVM_OPTS}
+    volumes:
+      - ./etc/jmx_exporter/config_kafka103.yml:/etc/jmx_exporter/config.yml
+    container_name: jmx-kafka103
+    depends_on:
+      - kafka-a-1
+      - kafka-a-2
+      - kafka-b-1
+      - kafka-b-2
 
 volumes:
   zookeeper-a-data: {}
